@@ -1,10 +1,16 @@
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 const cors = require("cors");
+const https = require("https");
 
 const app = express();
 
 app.use(cors());
+
+const httpsAgent = new https.Agent({
+  keepAlive: true,
+  maxSockets: 50,
+});
 
 app.use(
   "/bmtc",
@@ -12,8 +18,20 @@ app.use(
     target: "https://bmtcmobileapi.karnataka.gov.in",
     changeOrigin: true,
     secure: true,
+    agent: httpsAgent,
+    timeout: 30000,
+    proxyTimeout: 30000,
     pathRewrite: {
       "^/bmtc": "",
+    },
+    onError: (err, req, res) => {
+      console.error("Proxy error:", err && (err.code || err.message || err));
+      if (res.headersSent) return;
+      res.status(502).json({
+        error: "Bad Gateway",
+        message: "Upstream BMTC API request failed",
+        details: err && (err.code || err.message) ? String(err.code || err.message) : undefined,
+      });
     },
   })
 );
