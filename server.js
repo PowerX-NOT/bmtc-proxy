@@ -25,7 +25,13 @@ app.use(
       "^/bmtc": "",
     },
     onError: (err, req, res) => {
-      console.error("Proxy error:", err && (err.code || err.message || err));
+      console.error(
+        "Proxy error:",
+        req.method,
+        req.originalUrl,
+        "->",
+        err && (err.code || err.message || err)
+      );
       if (res.headersSent) return;
       res.status(502).json({
         error: "Bad Gateway",
@@ -35,6 +41,45 @@ app.use(
     },
   })
 );
+
+app.get("/_upstream-check", (req, res) => {
+  const startedAt = Date.now();
+  const url = "https://bmtcmobileapi.karnataka.gov.in";
+
+  const request = https.request(
+    url,
+    {
+      method: "HEAD",
+      agent: httpsAgent,
+      timeout: 10000,
+    },
+    (upstreamRes) => {
+      upstreamRes.resume();
+      res.json({
+        ok: true,
+        url,
+        statusCode: upstreamRes.statusCode,
+        durationMs: Date.now() - startedAt,
+      });
+    }
+  );
+
+  request.on("timeout", () => {
+    request.destroy(new Error("UPSTREAM_TIMEOUT"));
+  });
+
+  request.on("error", (err) => {
+    res.status(502).json({
+      ok: false,
+      url,
+      error: err && err.message ? err.message : String(err),
+      code: err && err.code ? String(err.code) : undefined,
+      durationMs: Date.now() - startedAt,
+    });
+  });
+
+  request.end();
+});
 
 app.get("/", (req, res) => {
   res.send("BMTC Proxy is running 🚀");
