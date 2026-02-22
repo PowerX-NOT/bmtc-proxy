@@ -12,6 +12,12 @@ const httpsAgent = new https.Agent({
   maxSockets: 50,
 });
 
+const PROXY_TIMEOUT_MS = Number.parseInt(process.env.PROXY_TIMEOUT_MS || "120000", 10);
+const UPSTREAM_CHECK_TIMEOUT_MS = Number.parseInt(
+  process.env.UPSTREAM_CHECK_TIMEOUT_MS || "30000",
+  10
+);
+
 app.use(
   "/bmtc",
   createProxyMiddleware({
@@ -19,8 +25,8 @@ app.use(
     changeOrigin: true,
     secure: true,
     agent: httpsAgent,
-    timeout: 30000,
-    proxyTimeout: 30000,
+    timeout: PROXY_TIMEOUT_MS,
+    proxyTimeout: PROXY_TIMEOUT_MS,
     pathRewrite: {
       "^/bmtc": "",
     },
@@ -51,7 +57,7 @@ app.get("/_upstream-check", (req, res) => {
     {
       method: "HEAD",
       agent: httpsAgent,
-      timeout: 10000,
+      timeout: UPSTREAM_CHECK_TIMEOUT_MS,
     },
     (upstreamRes) => {
       upstreamRes.resume();
